@@ -6,14 +6,14 @@
 /*   By: rabusala <rabusala@student.42.fr>          +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2026/02/15 14:06:49 by rabusala          #+#    #+#             */
-/*   Updated: 2026/03/05 12:09:19 by rabusala         ###   ########.fr       */
+/*   Updated: 2026/03/15 15:54:46 by rabusala         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
 #include "HttpReq.hpp"
 #include "client.hpp"
 #include <algorithm>
-#include <ctype>
+#include <ctype.h>
 
 std::string toLower(const std::string& input)
 {
@@ -236,9 +236,9 @@ int readChunks(client &cli)
 				return -1;
 			cli.getReq().appendBody(cli.getBuffer().substr(0,cli.getChunkSize()));
 			cli.setBuffer(cli.getBuffer().erase(0,needed));
-			if(cli.getReq().getBody().size() > cli.getMaxBodySize())
+			if(cli.getReq().getBody().size() > cli.getServer().getMaxBodySize())
 			{
-				cli.setState(403);
+				cli.getRes().setStatusCode(403);
 				return -1;
 			}
 			cli.setChunkState(READCHUNK);
@@ -281,6 +281,7 @@ int	handleRead(client &cli,int fd)
 				if(checker == 1)
 				{
 					cli.setRequestComplete(true);
+					cli.setBodySize(cli.getReq().getBody().size());
 					cli.setState(ROUTING);
 				}
 			}

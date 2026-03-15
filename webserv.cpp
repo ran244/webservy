@@ -6,7 +6,7 @@
 /*   By: rabusala <rabusala@student.42.fr>          +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2026/02/12 17:32:41 by tabuayya          #+#    #+#             */
-/*   Updated: 2026/03/08 21:18:13 by rabusala         ###   ########.fr       */
+/*   Updated: 2026/03/15 18:05:45 by rabusala         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -99,18 +99,32 @@ int webserv::handle_new_connection(int listen_fd, server& srv)
 			close(client_fd);
 			continue;
 		}
-		client new_client(client_fd);
+		client new_client(client_fd,&srv);
 		srv.addClientFd(client_fd, new_client);
 	}
 	return 1;
 }
-void handleUpload(client &cli,server &serv)
+void handleUpload(client &cli,server &serv,ClientState &state)
 {
-	
+	cli.setPostFileFd(open(cli.getUploadPath().c_str(),O_CREAT|O_WRONLY|O_TRUNC,0644));
+	if(cli.getPostFileFd()<0)
+	{
+		cli.setState(SENDING_RESPONSE);
+		cli.getRes().setStatusCode(500);
+		return ;
+	}
+	write(cli.getPostFileFd(),cli.getReq().getBody().c_str(),cli.getContentLength());
+	close(cli.getPostFileFd());
+	if(state == UPLOADING)
+		cli.getRes().setStatusCode(200);
+	else if(state == OVERWRITE)
+		cli.getRes().setStatusCode(201);
+	cli.setState(SENDING_RESPONSE);
+	return ;
 }
 void	state_machine(client &cli,server &serv, int fd, uint32_t events)
 {
-	ClientState state=cli.getState();
+		ClientState state=cli.getState();
 	if(state == READING && (events & EPOLLIN))
 	{
 		if(handleRead(cli,fd) == 1)
@@ -127,14 +141,11 @@ void	state_machine(client &cli,server &serv, int fd, uint32_t events)
 			return;
 		}
 	}
-	if(state == UPLOADING)
+	if(state == UPLOADING || state ==OVERWRITE)
 	{
-		handleUpload(cli,serv);
+		handleUpload(cli,serv,state);
 	}
-	if(state == OVERWRITE)
-	{
-		//handleoverwrite(cli,srv);
-	}
+
 	// if(state == SENDING_RESPONSE && (events & EPOLLOUT))
 	// {
 	// 	if(handleWrite(cli,fd) == 1)
