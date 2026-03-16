@@ -302,6 +302,7 @@ int handleRouting(client &cli, server &srv)
 	    cli.setState(SENDING_RESPONSE);
 	    return -1;
 	}
+	return 1;
 
 }
 const LocationConfig* findLongestMatch(const std::string& uri, const std::map<std::string, LocationConfig>& locations) //or locationobj

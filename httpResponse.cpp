@@ -38,6 +38,10 @@ void HttpResponse::setContentLength(size_t contentLength) { this->contentLength 
 void HttpResponse::setMemoryBody(const std::string& memoryBody) { this->memoryBody = memoryBody; }
 void HttpResponse::setFileBody(const std::string& fileBody) { this->fileBody = fileBody; }
 void HttpResponse::addResHeader(const std::string& key, const std::string& value) { resHeaders[key] = value; }
+void HttpResponse::appendFileBody(const std::string &body,ssize_t n)
+{
+	fileBody.append(body,n);
+}
 void HttpResponse::setContentType(const std::string& filepath)
 {
 	size_t dotPos = filepath.find_last_of(".");

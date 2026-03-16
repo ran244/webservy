@@ -104,7 +104,7 @@ int webserv::handle_new_connection(int listen_fd, server& srv)
 	}
 	return 1;
 }
-void handleUpload(client &cli,server &serv,ClientState &state)
+void handleUpload(client &cli,server &serv,const ClientState &state)
 {
 	cli.setPostFileFd(open(cli.getUploadPath().c_str(),O_CREAT|O_WRONLY|O_TRUNC,0644));
 	if(cli.getPostFileFd()<0)
@@ -122,10 +122,45 @@ void handleUpload(client &cli,server &serv,ClientState &state)
 	cli.setState(SENDING_RESPONSE);
 	return ;
 }
-void	state_machine(client &cli,server &serv, int fd, uint32_t events)
+void handleFileReading(client &cli,server &srv)
 {
-		ClientState state=cli.getState();
-	if(state == READING && (events & EPOLLIN))
+	char readBuffer[8192];
+	ssize_t n=read(cli.getGetFileFd(),readBuffer,sizeof(readBuffer));
+	if(n>0)
+	{
+		cli.getRes().appendFileBody(readBuffer,n);
+		cli.setState(SENDING_RESPONSE);
+	}
+	else if(n==0)
+	{
+		close(cli.getGetFileFd());
+		cli.setFileDone(true);
+		cli.setState(SENDING_RESPONSE);
+	}
+	else
+	{
+		close(cli.getGetFileFd());
+		cli.getRes().setStatusCode(500);
+		cli.setState(SENDING_RESPONSE);
+	}
+}
+void handleWrite(client &cli,server &serv)
+{
+	
+}
+void webserv::setEpoll(int epollFd, int clientFd,int flag)
+{
+    struct epoll_event ev;
+	if(flag == 0)
+		ev.events = EPOLLIN;
+	else if(flag == 1)
+    	ev.events = EPOLLOUT;
+    ev.data.fd = clientFd;
+    epoll_ctl(epollFd, EPOLL_CTL_MOD, clientFd, &ev);
+}
+void	webserv::state_machine(client &cli,server &serv, int fd, uint32_t events)
+{
+	if(cli.getState()== READING && (events & EPOLLIN))
 	{
 		if(handleRead(cli,fd) == 1)
 		{
@@ -133,19 +168,29 @@ void	state_machine(client &cli,server &serv, int fd, uint32_t events)
 			return;
 		}
 	}
-	if(state == ROUTING)
+	if(cli.getState() == ROUTING)
 	{
 		if(handleRouting(cli,serv) == 1)
 		{
-			cli.setState(DONE);
+			setEpoll(epoll_fd,cli.getFd(),1);
 			return;
 		}
 	}
-	if(state == UPLOADING || state ==OVERWRITE)
+	if(cli.getState() == UPLOADING || cli.getState() == OVERWRITE)
 	{
-		handleUpload(cli,serv,state);
+		handleUpload(cli,serv,cli.getState());
 	}
-
+	if(events & EPOLLOUT)
+	{
+		if(cli.getState() == READINGFILE)
+		{
+			handleFileReading(cli,serv);
+		}
+		if(cli.getState()==SENDING_RESPONSE)
+		{
+			handleWrite(cli,serv);
+		}
+	}
 	// if(state == SENDING_RESPONSE && (events & EPOLLOUT))
 	// {
 	// 	if(handleWrite(cli,fd) == 1)
