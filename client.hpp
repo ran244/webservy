@@ -45,6 +45,7 @@ class client
 {
 	int fd;
 	server* _server;
+	const LocationConfig *location;
 	server srv;
 	ClientState state;
 	chunksStates cstate;
@@ -123,7 +124,6 @@ class client
 		void setIsDir(bool val);
 		void setIsChunkedEncoded(bool val);
 		void setUploadPath(std::string path);
-		void setServer(server &srv);
 		//checkers
 		bool isChunkedEncode();
 		bool isHeaderComplete();
@@ -132,6 +132,8 @@ class client
 		void setServer(server* srv);
     	server* getServer();
     	const server* getServer() const;
+		const LocationConfig* getLocation();
+		void setLocation(const LocationConfig *loc);
 
 };
 

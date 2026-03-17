@@ -135,6 +135,7 @@ void handleFileReading(client &cli,server &srv)
 	{
 		close(cli.getGetFileFd());
 		cli.setFileDone(true);
+		cli.getRes().setStatusCode(200);
 		cli.setState(SENDING_RESPONSE);
 	}
 	else
@@ -144,8 +145,27 @@ void handleFileReading(client &cli,server &srv)
 		cli.setState(SENDING_RESPONSE);
 	}
 }
+void generateErrorResponse(client &cli,server &serv)
+{
+	const LocationConfig* loc = cli.getLocation();
+	const std::map<int, std::string>& errorPages = loc->getErrorPages();
+	for (std::map<int, std::string>::const_iterator it = errorPages.begin();it != errorPages.end();it++)
+	{
+		if(cli.getRes().getStatusCode() == it->first)
+
+	    int code = it->first;
+	    std::string path = it->second;
+	}
+}
+void generateResponseHeader(client &cli,server &srv)
+{
+	if(cli.getRes().getStatusCode() != 200)
+		generateErrorResponse(cli,srv);
+}
 void handleWrite(client &cli,server &serv)
 {
+	if(!cli.getRes().getGeneratedResponseHeader())
+		generateResponseHeader(cli,serv);
 	
 }
 void webserv::setEpoll(int epollFd, int clientFd,int flag)

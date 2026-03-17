@@ -248,6 +248,7 @@ int handleRouting(client &cli, server &srv)
 	std::string uri = cli.getReq().getUri();
 	const std::map<std::string, LocationConfig>& locations = srv.getLocations();
 	const LocationConfig* matchedLocation = findLongestMatch(uri, locations);
+	cli.setLocation(matchedLocation);
 	if (matchedLocation)
 	{
 		if(checkValidLocConfig(cli, srv, *matchedLocation) == 1)

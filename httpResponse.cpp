@@ -11,7 +11,7 @@
 /* ************************************************************************** */
 
 #include "httpResponse.hpp"
-HttpResponse::HttpResponse() : fileFd(-1), fileSize(0), fileOffset(0),hasFileBody(false), version("HTTP/1.1"), statusCode(200), reason("OK"), contentLength(0)
+HttpResponse::HttpResponse() : generatedResponseHeader(false), fileFd(-1), fileSize(0), fileOffset(0),hasFileBody(false), version("HTTP/1.1"), statusCode(200), reason("OK"), contentLength(0)
 {
 	_initMimeTypes();
 }

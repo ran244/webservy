@@ -166,3 +166,11 @@ const server* client::getServer() const
 {
 	return _server;
 }
+const LocationConfig* client::getLocation()
+{
+	return location;
+}
+void client::setLocation(const LocationConfig *loc)
+{
+	location=loc;
+}
