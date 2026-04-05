@@ -10,6 +10,9 @@
 /*                                                                            */
 /* ************************************************************************** */
 
+#include <dirent.h>
+#include <sys/stat.h>
+#include <sstream>
 #include "webserv.hpp"
 #include "server.hpp"
 
@@ -50,6 +53,62 @@ std::string setupRootPath(client &cli, server &srv, const LocationConfig& locCon
 		uri.erase(0, 1);
 
 	return (root + uri);
+}
+
+void generateAutoindexListing(client &cli, const std::string& uri, const std::string& rootPath)
+{
+	DIR *dir = opendir(rootPath.c_str());
+    if (!dir)
+    {
+        cli.getRes().setStatusCode(500);
+        return;
+    }
+
+    std::stringstream html;
+
+    html << "<!DOCTYPE html>\n<html>\n<head>\n";
+    html << "<title>Index of " << uri << "</title>\n";
+    html << "<style>\n"
+         << "body{font-family:monospace;background:#f8f8f8;padding:20px;}\n"
+         << "a{text-decoration:none;color:#0066cc;}\n"
+         << "a:hover{text-decoration:underline;}\n"
+         << "</style>\n";
+    html << "</head>\n<body>\n";
+
+    html << "<h1>Index of " << uri << "</h1>\n<hr>\n";
+
+    // Parent directory
+    if (uri != "/")
+        html << "<div><a href=\"../\">../</a></div>\n";
+
+    struct dirent *entry;
+    while ((entry = readdir(dir)) != NULL)
+    {
+        std::string name = entry->d_name;
+
+        if (name == ".")
+            continue;
+
+        std::string fullPath = rootPath + "/" + name;
+
+        struct stat st;
+        if (stat(fullPath.c_str(), &st) == -1)
+            continue;
+
+        std::string displayName = name;
+
+        if (S_ISDIR(st.st_mode))
+            displayName += "/";
+
+        html << "<div><a href=\"" << displayName << "\">"
+             << displayName << "</a></div>\n";
+    }
+
+    html << "<hr>\n</body>\n</html>";
+
+    closedir(dir);
+
+    cli.getRes().appendFileBody(html.str(),(html.str()).size());
 }
 int get_method(client &cli, server &srv, const LocationConfig& locConfig, std::string uri)
 {
