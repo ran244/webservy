@@ -3,10 +3,10 @@
 /*                                                        :::      ::::::::   */
 /*   client.hpp                                         :+:      :+:    :+:   */
 /*                                                    +:+ +:+         +:+     */
-/*   By: rabusala <rabusala@student.42.fr>          +#+  +:+       +#+        */
+/*   By: tabuayya <tabuayya@student.42.fr>          +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2026/02/16 16:24:47 by rabusala          #+#    #+#             */
-/*   Updated: 2026/03/15 18:04:21 by rabusala         ###   ########.fr       */
+/*   Updated: 2026/04/09 16:23:54 by tabuayya         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -15,9 +15,8 @@
 
 #include <string>
 #include <cstddef> // size_t
-
-#include "HttpReq.hpp"
 #include "server.hpp"
+#include "HttpReq.hpp"
 #include "httpResponse.hpp"
 enum ClientState
 {
@@ -29,7 +28,7 @@ enum ClientState
 	OVERWRITE,
 	READINGFILE,
 	SENDING_RESPONSE,
-
+	ERROR,
 	DONE
 };
 enum chunksStates
@@ -40,13 +39,14 @@ enum chunksStates
 };
 
 class server;
+// class HttpResponse;
 
 class client
 {
 	int fd;
 	server* _server;
 	const LocationConfig *location;
-	server srv;
+	// server srv;
 	ClientState state;
 	chunksStates cstate;
 	int code;
@@ -62,9 +62,8 @@ class client
 	//outfile
 	size_t postFileSize;
 	int postFileFd;
-	int postFileOffset;
 	int getFileFd;
-	int getFileOffset;
+	size_t BytesSent;
 
 	bool fileDone;
 	bool isDir;
@@ -72,6 +71,8 @@ class client
 	std::string uploadPath;
 	size_t chunkSize;
 	size_t bodySize;
+	size_t fileOffset;
+	size_t bytesTosend;
 	public:
 		client();
 		client(int fd,server *srv);
@@ -80,12 +81,11 @@ class client
 		~client();
 		//getters
 		int getFd();
+		size_t getBytesToSend();
 		chunksStates getChunkState();
 		int getGetFileFd();
-		int getGetFileOffset();
 		int getPostFileFd();
-		int getPostFileOffset();
-
+		size_t getBytesSent();
 		int getCode();
 		bool getIsDir();
 		size_t getChunkSize();
@@ -97,26 +97,32 @@ class client
 		size_t getFileSize();
 		HttpResponse& getRes();
 		std::string getBuffer();
-		std::string getResponseBuffer();
+		// std::string getResponseBuffer();
+		std::string& getResponseBuffer();              // modify
+		const std::string& getResponseBuffer() const;  // read-only
 		std::string getUploadPath() const;
 		size_t getBodySize();
+		size_t getFileOffset();
 		//setters
+		void setBytesToSend(size_t n);
+		void setFileOffset(size_t n);
 		void setBodySize(size_t s);
 		void setFd(int fd);
+		void setBytesSent(size_t n);
 		void setChunkSize(size_t size);
 		void setChunkState(chunksStates cstate);
 		void setBodyStart(size_t n);
 		void setState(ClientState state);
 		void setBuffer(const std::string &buffer);
 		void setResponseBuffer(const std::string &responseBuffer);
+		// std::string& getResponseBuffer() const;
 		void setContentLength(size_t contentLength);
 		void setHeaderComplete(bool headerComplete);
 		void setRequestComplete(bool requestComplete);
 		void setHeader(const std::string &header);
-		void appendToBuffer(const std::string &data,int n);
+		void appendToResBuffer(const std::string &data,size_t n);
 		void setFileSize(size_t num);
-		void setPostFileOffset(int num);
-		void setGetFileOffset(int num);
+		void addBytesSent(size_t num);
 		void setFileDone(bool done);
 		void setCode(int code);
 		void setPostFileFd(int fd);
@@ -124,6 +130,10 @@ class client
 		void setIsDir(bool val);
 		void setIsChunkedEncoded(bool val);
 		void setUploadPath(std::string path);
+		void appendtobuff(std::string buff, size_t n){
+		buffer += buff;
+		n += n;
+		}
 		//checkers
 		bool isChunkedEncode();
 		bool isHeaderComplete();

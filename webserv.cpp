@@ -3,10 +3,10 @@
 /*                                                        :::      ::::::::   */
 /*   webserv.cpp                                        :+:      :+:    :+:   */
 /*                                                    +:+ +:+         +:+     */
-/*   By: rabusala <rabusala@student.42.fr>          +#+  +:+       +#+        */
+/*   By: tabuayya <tabuayya@student.42.fr>          +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2026/02/12 17:32:41 by tabuayya          #+#    #+#             */
-/*   Updated: 2026/03/15 18:05:45 by rabusala         ###   ########.fr       */
+/*   Updated: 2026/04/09 15:46:25 by tabuayya         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -18,12 +18,12 @@ webserv::webserv()
 webserv::~webserv()
 {
 }
-std::vector<server>& webserv::getServers()
+std::list<server>& webserv::getServers()
 {
 	return servers;
 }
 
-const std::vector<server>& webserv::getServers() const
+const std::list<server>& webserv::getServers() const
 {
 	return(this->servers);
 }
@@ -39,12 +39,12 @@ int webserv::initialize_epoll()
 		std::cerr << "Failed to create epoll file descriptor" << std::endl;
 		return -1;
 	}
-	for(size_t i=0;i<getServers().size();i++)
+	for (std::list<server>::iterator it = servers.begin(); it != servers.end(); ++it)
 	{
-		const std::vector<int>& listenfds = servers[i].getServerFd();
-		for(size_t j=0;j<listenfds.size();j++)
-		{
-			int fd = listenfds[j];
+    const std::vector<int>& listenfds = it->getServerFd();
+    for (size_t j = 0; j < listenfds.size(); j++)
+    {
+        int fd = listenfds[j];
 			struct epoll_event event;
 			event.events = EPOLLIN;
 			event.data.fd = fd;
@@ -55,21 +55,24 @@ int webserv::initialize_epoll()
 				return -1;
 			}
 		}
+
 	}
+
 	return(0);
 }
 bool webserv::is_server_socket(int fd)
 {
-	for (size_t i = 0; i < servers.size(); ++i)
-	{
-		const std::vector<int>& listenFds = servers[i].getServerFd();
-		for (size_t j = 0; j < listenFds.size(); ++j)
-		{
-			if (fd == listenFds[j])
-				return true;
-		}
-	}
-	return false;
+	for (std::list<server>::iterator it = servers.begin(); it != servers.end(); ++it)
+{
+    const std::vector<int>& listenFds = it->getServerFd();
+
+    for (size_t j = 0; j < listenFds.size(); ++j)
+    {
+        if (fd == listenFds[j])
+            return true;
+    }
+}
+return false;
 }
 int webserv::handle_new_connection(int listen_fd, server& srv)
 {
@@ -104,203 +107,118 @@ int webserv::handle_new_connection(int listen_fd, server& srv)
 	}
 	return 1;
 }
-void handleUpload(client &cli,server &serv,const ClientState &state)
-{
-	cli.setPostFileFd(open(cli.getUploadPath().c_str(),O_CREAT|O_WRONLY|O_TRUNC,0644));
-	if(cli.getPostFileFd()<0)
-	{
-		cli.setState(SENDING_RESPONSE);
-		cli.getRes().setStatusCode(500);
-		return ;
-	}
-	write(cli.getPostFileFd(),cli.getReq().getBody().c_str(),cli.getContentLength());
-	close(cli.getPostFileFd());
-	if(state == UPLOADING)
-		cli.getRes().setStatusCode(200);
-	else if(state == OVERWRITE)
-		cli.getRes().setStatusCode(201);
-	cli.setState(SENDING_RESPONSE);
-	return ;
-}
-void handleFileReading(client &cli,server &srv)
-{
-	char readBuffer[8192];
-	ssize_t n=read(cli.getGetFileFd(),readBuffer,sizeof(readBuffer));
-	if(n>0)
-	{
-		cli.getRes().appendFileBody(readBuffer,n);
-		cli.setState(SENDING_RESPONSE);
-	}
-	else if(n==0)
-	{
-		close(cli.getGetFileFd());
-		cli.setFileDone(true);
-		cli.getRes().setStatusCode(200);
-		cli.setState(SENDING_RESPONSE);
-	}
-	else
-	{
-		close(cli.getGetFileFd());
-		cli.getRes().setStatusCode(500);
-		cli.setState(SENDING_RESPONSE);
-	}
-}
-void generateErrorResponse(client &cli,server &serv)
-{
-	const LocationConfig* loc = cli.getLocation();
-	const std::map<int, std::string>& errorPages = loc->getErrorPages();
-	for (std::map<int, std::string>::const_iterator it = errorPages.begin();it != errorPages.end();it++)
-	{
-		if(cli.getRes().getStatusCode() == it->first)
-
-	    int code = it->first;
-	    std::string path = it->second;
-	}
-}
-void generateResponseHeader(client &cli,server &srv)
-{
-	if(cli.getRes().getStatusCode() != 200)
-		generateErrorResponse(cli,srv);
-}
-void handleWrite(client &cli,server &serv)
-{
-	if(!cli.getRes().getGeneratedResponseHeader())
-		generateResponseHeader(cli,serv);
-	
-}
-void webserv::setEpoll(int epollFd, int clientFd,int flag)
-{
-    struct epoll_event ev;
-	if(flag == 0)
-		ev.events = EPOLLIN;
-	else if(flag == 1)
-    	ev.events = EPOLLOUT;
-    ev.data.fd = clientFd;
-    epoll_ctl(epollFd, EPOLL_CTL_MOD, clientFd, &ev);
-}
-void	webserv::state_machine(client &cli,server &serv, int fd, uint32_t events)
-{
-	if(cli.getState()== READING && (events & EPOLLIN))
-	{
-		if(handleRead(cli,fd) == 1)
-		{
-			cli.setState(DONE);
-			return;
-		}
-	}
-	if(cli.getState() == ROUTING)
-	{
-		if(handleRouting(cli,serv) == 1)
-		{
-			setEpoll(epoll_fd,cli.getFd(),1);
-			return;
-		}
-	}
-	if(cli.getState() == UPLOADING || cli.getState() == OVERWRITE)
-	{
-		handleUpload(cli,serv,cli.getState());
-	}
-	if(events & EPOLLOUT)
-	{
-		if(cli.getState() == READINGFILE)
-		{
-			handleFileReading(cli,serv);
-		}
-		if(cli.getState()==SENDING_RESPONSE)
-		{
-			handleWrite(cli,serv);
-		}
-	}
-	// if(state == SENDING_RESPONSE && (events & EPOLLOUT))
-	// {
-	// 	if(handleWrite(cli,fd) == 1)
-	// 	{
-	// 		cli.setState(DONE);
-	// 		return;
-	// 	}
-	// }
-}
 void webserv::close_client_connection(int fd)
 {
-	epoll_ctl(epoll_fd, EPOLL_CTL_DEL, fd, NULL);
-	close(fd);
-	for (size_t j = 0; j < servers.size(); ++j)
-	{
-	    std::map<int, client>& client_fds = servers[j].getClientFds();
-	    std::map<int, client>::iterator it = client_fds.find(fd);
-	    if (it != client_fds.end())
-	    {
-	        client_fds.erase(it);
-	        break;
-	    }
-	}
+    for (std::list<server>::iterator sit = servers.begin(); sit != servers.end(); ++sit)
+    {
+        std::map<int, client>& client_fds = sit->getClientFds();
+        std::map<int, client>::iterator it = client_fds.find(fd);
+
+        if (it != client_fds.end())
+        {
+            client_fds.erase(it);
+            break;
+        }
+    }
+
+    epoll_ctl(epoll_fd, EPOLL_CTL_DEL, fd, NULL);
+    close(fd);
 }
 int webserv::run()
 {
-	struct epoll_event events[100];
-	while(true)
-	{
-		int num_events = epoll_wait(epoll_fd, events, 100, -1);
-		if(num_events == -1)
-		{
-			if (errno == EINTR)
-				continue;
-			std::cerr << "epoll_wait error" << std::endl;
-			break;
-		}
-		for (int i = 0; i < num_events; ++i)
-		{
-			int fd = events[i].data.fd;
-				if (is_server_socket(fd))
-				{
-					for (size_t j = 0; j < servers.size(); ++j)
+    struct epoll_event events[100];
+
+    while(true)
+    {
+        int num_events = epoll_wait(epoll_fd, events, 100, -1);
+        if(num_events == -1)
+        {
+            if (errno == EINTR)
+                continue;
+            std::cerr << "epoll_wait error" << std::endl;
+            break;
+        }
+
+        std::vector<int> r_cli; // ✅ only one, correct type
+
+        for (int i = 0; i < num_events; ++i)
+        {
+            int fd = events[i].data.fd;
+
+            // 🔹 HANDLE NEW CONNECTIONS
+            if (is_server_socket(fd))
+            {
+                for (std::list<server>::iterator sit = servers.begin(); sit != servers.end(); ++sit)
+                {
+                    const std::vector<int>& listenFds = sit->getServerFd();
+
+                    for (size_t k = 0; k < listenFds.size(); ++k)
+                    {
+                        if (fd == listenFds[k])
+                        {
+                            handle_new_connection(fd, *sit);
+                            break;
+                        }
+                    }
+                }
+                continue;
+            }
+
+            // 🔹 HANDLE ERRORS
+            if (events[i].events & (EPOLLERR | EPOLLHUP))
+            {
+                close_client_connection(fd);
+                continue;
+            }
+
+            // 🔹 HANDLE CLIENT EVENTS
+            for (std::list<server>::iterator sit = servers.begin(); sit != servers.end(); ++sit)
+            {
+                std::map<int, client>& client_fds = sit->getClientFds();
+                std::map<int, client>::iterator it = client_fds.find(fd);
+
+                if (it != client_fds.end())
+                {
+                    state_machine(it->second, *sit, fd, events[i].events);
+                    if (it->second.getState() == ROUTING)
+                        r_cli.push_back(fd);
+
+                    if (it->second.getState() == DONE)
+                        close_client_connection(fd);
+
+                    break;
+                }
+            }
+        }
+        for (size_t i = 0; i < r_cli.size(); i++)
+        {
+            int fd = r_cli[i];
+
+            for (std::list<server>::iterator sit = servers.begin(); sit != servers.end(); ++sit)
+            {
+                std::map<int, client>& client_fds = sit->getClientFds();
+                std::map<int, client>::iterator it = client_fds.find(fd);
+
+                if (it != client_fds.end())
+                {
+                    state_machine(it->second, *sit, fd, 0);
+                    if (it->second.getState() == DONE)
 					{
-						const std::vector<int>& listenFds = servers[j].getServerFd();
-						for (size_t k = 0; k < listenFds.size(); ++k)
-						{
-							if (fd == listenFds[k])
-							{
-								handle_new_connection(fd, servers[j]);
-								continue;
-							}
-						}
+                        close_client_connection(fd);
 					}
-				}
-				if (events[i].events & (EPOLLERR | EPOLLHUP))
-				{
-					std::cerr << "Error on fd " << fd << std::endl;
-					close_client_connection(fd);
-				}
-				else if (events[i].events & (EPOLLIN | EPOLLOUT))
-				{
-					for (size_t j = 0; j < servers.size(); ++j)
-					{
-						std::map<int, client>& client_fds = servers[j].getClientFds(); // reference!
-						std::map<int, client>::iterator it = client_fds.find(fd);
-						if (it != client_fds.end())
-						{
-							state_machine(it->second, servers[j], fd,events[i].events);
-							break;
-						}
-					}
-				}
-				//HANDLE CGI OUTPUT
-				//fdin & fdout for CGI processes
-				//handle_cgi_output(fd);
-				//if CGI process is done, remove fd from epoll and close it
-				//epoll_ctl(epoll_fd, EPOLL_CTL_DEL, fd, NULL);
-				//close(fd);
-				//remove CGI process from tracking data structures
-				//cgi_processes.erase(fd);
-				//remove client associated with this CGI process if needed
-			}
-	}
-	return 0;
+
+                    break;
+                }
+            }
+        }
+    }
+
+    return 0;
 }
 /**
-- state machine implementation
-- keep returning to the loop
-- get reading in chunks and returning
+ - state machine implementation
+ - keep returning to the loop
+ - get reading in chunks and returning
 - post in chunks
 -
  */

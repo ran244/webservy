@@ -3,10 +3,10 @@
 /*                                                        :::      ::::::::   */
 /*   webserv.hpp                                        :+:      :+:    :+:   */
 /*                                                    +:+ +:+         +:+     */
-/*   By: tabuayya <tabuayya@student.42.fr>          +#+  +:+       +#+        */
+/*   By: bushra <bushra@student.42.fr>              +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2026/02/08 17:57:41 by tabuayya          #+#    #+#             */
-/*   Updated: 2026/03/06 16:18:48 by tabuayya         ###   ########.fr       */
+/*   Updated: 2026/04/09 13:36:39 by bushra           ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -32,7 +32,7 @@
 #include <sys/epoll.h>
 #include <unistd.h>
 // #include "HttpReq.hpp"
-// #include "client.hpp"
+#include "client.hpp"
 #include "server.hpp"
 
 class client;
@@ -51,7 +51,7 @@ enum Codes
 class webserv
 {
 	private:
-		std::vector<server> servers;
+		std::list<server> servers;
 		int epoll_fd;
 	public:
 		webserv();
@@ -59,8 +59,8 @@ class webserv
 		int initialize_epoll();
 		int run();
 		int count;
-		std::vector<server>& getServers();
-		const	std::vector<server>& getServers() const;
+		std::list<server>& getServers();
+		const	std::list<server>& getServers() const;
 		void	setServers(const server& s);
 		int	conf_pars(char *file, int flag);
 		int		save_info(std::ifstream& inFile, server& s, int flag);
@@ -68,8 +68,8 @@ class webserv
 		bool is_server_socket(int fd);
 		int handle_new_connection(int fd, server& srv);
 		void close_client_connection(int fd);
-		void webserv::setEpoll(int epollFd, int clientFd,int flag);
-		void	webserv::state_machine(client &cli,server &serv, int fd, uint32_t events);
+		void setEpoll(int epollFd, int clientFd,int flag);
+		void	state_machine(client &cli,server &serv, int fd, uint32_t events);
 
 
 		std::vector<std::string> split(const std::string& line);
@@ -84,4 +84,14 @@ void parse_cgi(const std::vector<std::string>& tokens, LocationConfig& loc);
 std::vector<std::string> split(const std::string& line);
 void parse_error_page(const std::vector<std::string>& tokens, server& srv);
 void handle_client_write(int fd, client &cli);
+std::string setupRootPath(client &cli, server &srv, const LocationConfig& locConfig, std::string uri);
+int get_method(client &cli, server &srv, const LocationConfig& locConfig, std::string uri);
+int post_method(client &cli, server &srv, const LocationConfig& locConfig, std::string uri);
+void handleUpload(client &cli,server &serv,const ClientState &state);
+void handleFileReading(client &cli,server &srv);
+bool handleWrite(client &cli,server &serv);
+void generateResponseHeader(client &cli,server &srv);
+bool generateErrorResponse(client &cli,server &serv);
+
+
 #endif

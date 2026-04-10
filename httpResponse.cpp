@@ -6,20 +6,42 @@
 /*   By: tabuayya <tabuayya@student.42.fr>          +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2026/02/21 15:38:32 by tabuayya          #+#    #+#             */
-/*   Updated: 2026/03/05 22:16:10 by tabuayya         ###   ########.fr       */
+/*   Updated: 2026/04/09 15:11:47 by tabuayya         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
 #include "httpResponse.hpp"
-HttpResponse::HttpResponse() : generatedResponseHeader(false), fileFd(-1), fileSize(0), fileOffset(0),hasFileBody(false), version("HTTP/1.1"), statusCode(200), reason("OK"), contentLength(0)
+// HttpResponse::HttpResponse() : generatedResponseHeader(false), fileFd(-1), fileSize(0), Bytes_Sent(0),hasFileBody(false), version("HTTP/1.1"), statusCode(200), reason("OK"), contentLength(0)
+// {
+// 	_initMimeTypes();
+// }
+HttpResponse::HttpResponse() :
+	fileFd(-1),
+	fileSize(0),
+	Bytes_Sent(0),
+	hasFileBody(false),
+	hasMemoryBody(false),
+	NeedsAutoindex(false),
+	generatedResponseHeader(false),
+	version("HTTP/1.1"),
+	statusCode(0),
+	reason("OK"),
+	contentLength(0),
+	memoryBody(""),
+	fileBody(""),
+	contentType(""),
+	AutoIndexpath(""),
+	resHeaders(),
+	_mimeTypes()
 {
 	_initMimeTypes();
 }
 HttpResponse::~HttpResponse() {}
 int HttpResponse::getFileFd() { return fileFd; }
 size_t HttpResponse::getFileSize() { return fileSize; }
-size_t HttpResponse::getFileOffset() { return fileOffset; }
+size_t HttpResponse::getBytes_Sent() { return Bytes_Sent; }
 bool HttpResponse::getHasFileBody() { return hasFileBody; }
+bool HttpResponse::getHasMemoryBody() { return hasMemoryBody; }
 std::string HttpResponse::getVersion() { return version; }
 int HttpResponse::getStatusCode() { return statusCode; }
 std::string HttpResponse::getReason() { return reason; }
@@ -29,8 +51,9 @@ std::string HttpResponse::getFileBody() { return fileBody; }
 std::map<std::string, std::string> HttpResponse::getResHeaders() { return resHeaders; }
 void HttpResponse::setFileFd(int fd) { fileFd = fd; }
 void HttpResponse::setFileSize(size_t size) { fileSize = size; }
-void HttpResponse::setFileOffset(size_t offset) { fileOffset = offset; }
+void HttpResponse::setBytes_Sent(size_t offset) { Bytes_Sent = offset; }
 void HttpResponse::setHasFileBody(bool hasFileBody) { this->hasFileBody = hasFileBody; }
+void HttpResponse::setHasMemoryBody(bool memFileBody) { this->hasMemoryBody = memFileBody; }
 void HttpResponse::setVersion(const std::string& version) { this->version = version; }
 void HttpResponse::setStatusCode(int statusCode) { this->statusCode = statusCode; }
 void HttpResponse::setReason(const std::string& reason) { this->reason = reason; }
@@ -40,8 +63,15 @@ void HttpResponse::setFileBody(const std::string& fileBody) { this->fileBody = f
 void HttpResponse::addResHeader(const std::string& key, const std::string& value) { resHeaders[key] = value; }
 void HttpResponse::appendFileBody(const std::string &body,ssize_t n)
 {
-	fileBody.append(body,n);
+	(void)n;
+	fileBody+=body;
+	// fileBody.append(body,n);
 }
+void HttpResponse::setContentTypeString(const std::string& str)
+{
+	this->contentType = str;
+}
+
 void HttpResponse::setContentType(const std::string& filepath)
 {
 	size_t dotPos = filepath.find_last_of(".");
@@ -49,13 +79,15 @@ void HttpResponse::setContentType(const std::string& filepath)
 	if (dotPos != std::string::npos)
 	{
 		std::string ext = filepath.substr(dotPos);
-		for (size_t i = 0; i < ext.length(); ++i) ext[i] = std::tolower(ext[i]);
-
+		for (size_t i = 0; i < ext.length(); ++i)
+		{
+			ext[i] = std::tolower(ext[i]);
+		}
 		if (_mimeTypes.count(ext))
 			type = _mimeTypes[ext];
 	}
 	this->contentType = type;
-	addResHeader("Content-Type", type);
+	// addResHeader("Content-Type", type);
 }
 std::string HttpResponse::getContentType() { return contentType; }
 void HttpResponse::_initMimeTypes()

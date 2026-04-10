@@ -3,26 +3,29 @@
 /*                                                        :::      ::::::::   */
 /*   httpResponse.hpp                                   :+:      :+:    :+:   */
 /*                                                    +:+ +:+         +:+     */
-/*   By: rabusala <rabusala@student.42.fr>          +#+  +:+       +#+        */
+/*   By: tabuayya <tabuayya@student.42.fr>          +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2026/02/21 15:05:44 by tabuayya          #+#    #+#             */
-/*   Updated: 2026/03/08 16:32:36 by rabusala         ###   ########.fr       */
+/*   Updated: 2026/04/07 20:58:57 by tabuayya         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
 #ifndef HTTPRESPONSE_HPP
 #define HTTPRESPONSE_HPP
-#include "client.hpp"
+// #include "client.hpp"
 #include <string>
 #include <map>
 #include <cstddef>
+#include <unistd.h>
+class client;
 class HttpResponse
 {
 	private:
 		int fileFd;
 		size_t fileSize;
-		size_t fileOffset;
+		size_t Bytes_Sent;
 		bool hasFileBody;
+		bool hasMemoryBody;
 		bool NeedsAutoindex;
 		bool generatedResponseHeader;
 		std::string version;
@@ -41,8 +44,9 @@ class HttpResponse
 		~HttpResponse();
 		int getFileFd();
 		size_t getFileSize();
-		size_t getFileOffset();
+		size_t getBytes_Sent();
 		bool getHasFileBody();
+		bool getHasMemoryBody();
 		bool getNeedsAutoindex();
 		std::string getVersion();
 		int getStatusCode();
@@ -58,8 +62,9 @@ class HttpResponse
 		void setAutoindexFsPath(const std::string& path);
 		std::string getAutoindexFsPath();
 		void setFileSize(size_t size);
-		void setFileOffset(size_t offset);
+		void setBytes_Sent(size_t offset);
 		void setHasFileBody(bool hasFileBody);
+		void setHasMemoryBody(bool hasFileBody);
 		void setNeedsAutoindex(bool val);
 		void setVersion(const std::string& version);
 		void setStatusCode(int statusCode);
@@ -71,6 +76,8 @@ class HttpResponse
 		void addResHeader(const std::string& key, const std::string& value);
 		void setContentType(const std::string& contentType);
 		void setGeneratedResponseHeader(bool val){generatedResponseHeader = val; }
+	void setContentTypeString(const std::string& str);
+
 		//std::string generateResponse(client &cli, server &srv);
 		//functions
 		//void buildErrorResponse(Codes code,LocationConfig *loc);

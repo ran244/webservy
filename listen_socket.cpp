@@ -3,10 +3,10 @@
 /*                                                        :::      ::::::::   */
 /*   listen_socket.cpp                                  :+:      :+:    :+:   */
 /*                                                    +:+ +:+         +:+     */
-/*   By: rabusala <rabusala@student.42.fr>          +#+  +:+       +#+        */
+/*   By: bushra <bushra@student.42.fr>              +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2026/02/15 14:01:48 by balhamad          #+#    #+#             */
-/*   Updated: 2026/03/08 20:52:25 by rabusala         ###   ########.fr       */
+/*   Updated: 2026/04/09 13:48:53 by bushra           ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -16,38 +16,41 @@
 
 int init_sockets(webserv& spiderweb)
 {
-		std::vector<server>& servers = spiderweb.getServers();
-		for (size_t i = 0; i < servers.size(); ++i)
-		{
-			const std::vector<ListenConfig>& listens = servers[i].getListens();
+    std::list<server>& servers = spiderweb.getServers(); // get the list
 
-			if (listens.empty())
-			{
-				std::cerr << "Server " << i << " has no listen directive\n";
-				return -1;
-			}
-			for(size_t j=0;j<listens.size();j++)
-			{
+    size_t i = 0;
+    for (std::list<server>::iterator sit = servers.begin(); sit != servers.end(); ++sit, ++i)
+    {
+        const std::vector<ListenConfig>& listens = sit->getListens();
 
-				const ListenConfig& l = listens[j];
-				int fd = create_listen_socket(l.getHost(),l.getPort());
+        if (listens.empty())
+        {
+            std::cerr << "Server " << i << " has no listen directive\n";
+            return -1;
+        }
 
-				if (fd == -1)
-				{
-					std::cerr << "Failed to create listen socket for server "
-								<< i << std::endl;
-					return -1;
-				}
-				servers[i].addServerFd(fd);
-				printf("Server %zu listening on %s:%d (fd: %d)\n",
-					i,
-					l.getHost().c_str(),
-					l.getPort(),
-					fd
-				);
-			}
-		}
-	return 0;
+        for (size_t j = 0; j < listens.size(); ++j)
+        {
+            const ListenConfig& l = listens[j];
+            int fd = create_listen_socket(l.getHost(), l.getPort());
+
+            if (fd == -1)
+            {
+                std::cerr << "Failed to create listen socket for server " << i << std::endl;
+                return -1;
+            }
+
+            sit->addServerFd(fd);
+
+            printf("Server %zu listening on %s:%d (fd: %d)\n",
+                   i,
+                   l.getHost().c_str(),
+                   l.getPort(),
+                   fd);
+        }
+    }
+
+    return 0;
 }
 
 int create_listen_socket(const std::string& host, int port)

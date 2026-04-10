@@ -3,10 +3,10 @@
 /*                                                        :::      ::::::::   */
 /*   httpParser.cpp                                     :+:      :+:    :+:   */
 /*                                                    +:+ +:+         +:+     */
-/*   By: rabusala <rabusala@student.42.fr>          +#+  +:+       +#+        */
+/*   By: tabuayya <tabuayya@student.42.fr>          +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2026/02/15 14:06:49 by rabusala          #+#    #+#             */
-/*   Updated: 2026/03/15 15:54:46 by rabusala         ###   ########.fr       */
+/*   Updated: 2026/04/09 15:21:28 by tabuayya         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -14,6 +14,7 @@
 #include "client.hpp"
 #include <algorithm>
 #include <ctype.h>
+#include<stdio.h>
 
 std::string toLower(const std::string& input)
 {
@@ -80,6 +81,7 @@ int checkUri(std::string uri)
 }
 int parseReqLine(client &cli,std::string &reqline)
 {
+	// printf("%s\n",reqline.c_str());
 	std::string trimmedLine=ltrim(reqline);
 	size_t pos1=trimmedLine.find(" ");
 	if(pos1==std::string::npos)
@@ -120,7 +122,6 @@ int countLines(const std::string &buffer)  // Add const reference
 int parseHeader(client &cli)
 {
 	std::string copy = cli.getHeader();
-	std::cout<<"Header to parse:\n"<<copy<<std::endl;
 	int num = countLines(copy);
 	for(int i=0;i<num;i++)
 	{
@@ -187,7 +188,12 @@ int  checkHeader(client &cli)
 
 bool isHexString(const std::string& s)
 {
-    return std::all_of(s.begin(), s.end(), ::isxdigit);
+	for (std::string::const_iterator it = s.begin(); it != s.end(); ++it)
+	{
+		if (!isxdigit(*it))
+			return false;
+	}
+	return true;
 }
 
 ssize_t convertHexa(client &cli)
@@ -208,7 +214,7 @@ ssize_t convertHexa(client &cli)
 int readChunks(client &cli)
 {
 	ssize_t chunkSize;
-	size_t pos;
+	// size_t pos;
 	while(true)
 	{
 
@@ -236,7 +242,7 @@ int readChunks(client &cli)
 				return -1;
 			cli.getReq().appendBody(cli.getBuffer().substr(0,cli.getChunkSize()));
 			cli.setBuffer(cli.getBuffer().erase(0,needed));
-			if(cli.getReq().getBody().size() > cli.getServer().getMaxBodySize())
+			if(cli.getReq().getBody().size() > (size_t)cli.getServer()->getMaxBodySize())
 			{
 				cli.getRes().setStatusCode(403);
 				return -1;
@@ -248,23 +254,21 @@ int readChunks(client &cli)
 }
 int	handleRead(client &cli,int fd)
 {
+	(void) fd;
 	char temp[4096];
 	ssize_t n=recv(cli.getFd(),temp,4096,0);
 	if(n == 0)
-	{
-		cli.setState(DONE);
 		return 1;
-	}
 	else if(n > 0)
 	{
-		cli.appendToBuffer(temp,n);
+		cli.appendtobuff(temp,n);
 		if(!cli.isHeaderComplete())
 		{
 			if(checkHeader(cli) == 1)
 			{
 				if(cli.getCode() == 0)
 					cli.getRes().setStatusCode(400);
-				return 1;
+				return 0;
 			}
 		}
 		if(cli.isHeaderComplete())
@@ -276,7 +280,8 @@ int	handleRead(client &cli,int fd)
 				{
 					if(cli.getCode() == 0)
 						cli.getRes().setStatusCode(400);
-					return 1;
+					cli.setState(ERROR);
+					return 0;
 				}
 				if(checker == 1)
 				{
