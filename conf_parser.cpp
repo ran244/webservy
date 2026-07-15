@@ -3,10 +3,10 @@
 /*                                                        :::      ::::::::   */
 /*   conf_parser.cpp                                    :+:      :+:    :+:   */
 /*                                                    +:+ +:+         +:+     */
-/*   By: tabuayya <tabuayya@student.42.fr>          +#+  +:+       +#+        */
+/*   By: rabusala <rabusala@student.42.fr>          +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2026/02/12 16:34:42 by tabuayya          #+#    #+#             */
-/*   Updated: 2026/04/09 15:22:56 by tabuayya         ###   ########.fr       */
+/*   Updated: 2026/04/12 18:15:35 by rabusala         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -44,23 +44,15 @@ int	parse_listen(std::string s_line, std::string line, server& srv, int flag)
 {
 	flag = check_line(line);
 	size_t start = s_line.rfind(" ");
-	// if(start == std::string::npos)
-	// 	return (-1);
-	// std::cout<<start<<"\n";
 	int len = s_line.length() - start;
-	// std::cout<<len<<"\n";
 	std::string substr = s_line.substr(start + 1, len);
-	// std::cout<<substr<<"\n";
 	ListenConfig listen;
 	if(substr.find(":") != std::string::npos)
 	{
 		int pos = substr.find(":");
-		// std::cout<<"pos :"<<pos<<"\n";
 		listen.setHost(substr.substr(0 , pos));
-		// std::cout<<"host :"<<listen.getHost()<<"\n";
 		std::string port = substr.substr(pos + 1, substr.length() - pos);
 		listen.setPort(atoi(port.c_str()));
-		// std::cout<<"port :"<<listen.getPort()<<"\n";
 	}
 	else
 	{
@@ -68,13 +60,11 @@ int	parse_listen(std::string s_line, std::string line, server& srv, int flag)
 		{
 			listen.setHost(substr.substr(0 , substr.length()));
 			listen.setPort(0);
-			// std::cout<<"host :"<<listen.getHost()<<"\n";
 		}
 		else
 		{
 			std::string port = substr.substr(0 , substr.length());
 			listen.setPort(atoi(port.c_str()));
-			// std::cout<<"port :"<<listen.getPort()<<"\n";
 		}
 	}
 	srv.addListen(listen);
@@ -83,6 +73,7 @@ int	parse_listen(std::string s_line, std::string line, server& srv, int flag)
 
 int	store_location(std::string line,std::string s_line, server& srv, LocationConfig &loc, int flag)
 {
+	(void)srv;
 	flag = check_line(line);
 	if (flag == 0)
 		return (0);
@@ -113,7 +104,7 @@ int	store_location(std::string line,std::string s_line, server& srv, LocationCon
 		loc.setUploadStore(substr);
 	else if (!line.compare(0,5, "index"))
 		loc.setIndex(substr);
-	else if (!line.compare(0,8, "redirect"))
+	else if (!line.compare(0,6, "return"))
 		loc.setRedirect(substr);
 	else if (!line.compare(0,4, "root"))
 		loc.setRoot(substr);
@@ -133,7 +124,7 @@ int	store_location(std::string line,std::string s_line, server& srv, LocationCon
 			std::cerr << "Invalid error code in error_page\n";
 			exit(1);
 		}
-		srv.addErrorPage((int)code, tokens[2]);
+		loc.addErrorPage((int)code, tokens[2]);
 	}
 	else
 	{
@@ -165,6 +156,7 @@ int	parse_location(std::ifstream& inFile,std::string s_line, std::string line, s
 		flag = store_location(line, s_line, srv, loc, flag);
 	}
 	srv.addLocation(loc);
+	
 	return (flag);
 }
 
@@ -220,7 +212,7 @@ int	parse_default(std::string s_line,std::string line, server& srv, int flag)
 		srv.setUploadStore(substr);
 	else if (!line.compare(0,5, "index"))
 		srv.setIndex(substr);
-	else if (!line.compare(0,8, "redirect"))
+	else if (!line.compare(0,6, "return"))
 		srv.setRedirect(substr);
 	else if (!line.compare(0,4, "root"))
 		srv.setRoot(substr);
@@ -255,5 +247,6 @@ int	webserv::save_info(std::ifstream& inFile, server& srv, int flag)
 		else
 			flag = parse_default(s_line, line, srv, flag);
 	}
+
 	return (flag);
 }

@@ -6,7 +6,7 @@
 /*   By: tabuayya <tabuayya@student.42.fr>          +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2026/02/22 13:59:45 by tabuayya          #+#    #+#             */
-/*   Updated: 2026/04/09 18:40:57 by tabuayya         ###   ########.fr       */
+/*   Updated: 2026/04/18 17:46:04 by tabuayya         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -21,7 +21,6 @@ std::string setupRootPath(client &cli, server &srv, const LocationConfig& locCon
 	(void)cli;
 	(void)srv;
 	std::string Path = locConfig.getPath();
-	std::cerr<<"THE MATCHED LOCATION "<<locConfig.getPath()<<std::endl;
 	if(uri.find(Path) == 0)
 		uri.erase(0, Path.length());
 	std::string root = locConfig.getRoot();
@@ -42,10 +41,7 @@ void generateAutoindexListing(client &cli, const std::string& uri, const std::st
 		cli.getRes().setStatusCode(500);
 		return;
 	}
-
 	std::stringstream html;
-
-	// Header and CSS (C++98 compatible)
 	html << "<!DOCTYPE html>\n<html lang=\"en\">\n<head>\n";
 	html << "<meta charset=\"UTF-8\">\n";
 	html << "<title>✨ Index of " << uri << " ✨</title>\n";
@@ -66,7 +62,6 @@ void generateAutoindexListing(client &cli, const std::string& uri, const std::st
 		<< ".dir { font-weight: bold; }\n"
 		<< "</style>\n</head>\n<body>\n";
 
-	// Fast Floating Emojis
 	html << "<div class=\"decor\">\n"
 		<< "<span style=\"left:5%; animation-delay:0s;\">💖</span>\n"
 		<< "<span style=\"left:20%; animation-delay:0.4s;\">✨</span>\n"
@@ -78,12 +73,8 @@ void generateAutoindexListing(client &cli, const std::string& uri, const std::st
 
 	html << "<div class=\"container\">\n";
 	html << "<h1>📂 Index of " << uri << "</h1>\n";
-
-	// Parent Link
 	if (uri != "/")
 		html << "<a class=\"dir\" href=\"../\">⬅️ ../</a>\n";
-
-	// Read target directory files and folders
 	struct dirent *entry;
 	while ((entry = readdir(dir)) != NULL)
 	{
@@ -106,7 +97,7 @@ void generateAutoindexListing(client &cli, const std::string& uri, const std::st
 	closedir(dir);
 
 	std::string finalHtml = html.str();
-	cli.getRes().appendFileBody(finalHtml, finalHtml.size());
+	cli.getRes().appendFileBody(finalHtml.c_str(), finalHtml.size());
 	cli.getRes().setContentLength(finalHtml.size());
 }
 
@@ -115,10 +106,9 @@ int get_method(client &cli, server &srv, const LocationConfig& locConfig, std::s
 	std::string rootPath = setupRootPath(cli, srv, locConfig, uri);
 	const char *chr_str = rootPath.c_str();
 	struct stat stat_buf;
-	
+
 	if (stat(chr_str, &stat_buf) == -1)
 	{
-		std::cerr<<"in getttttttttttttttt "<<rootPath<<std::endl;
 		cli.getRes().setStatusCode(NOT_FOUND);
 		cli.setState(ERROR);
 		return (-1);
@@ -138,6 +128,7 @@ int get_method(client &cli, server &srv, const LocationConfig& locConfig, std::s
 		struct stat indexStat;
 		if (!locConfig.getIndex().empty())
 		{
+			std::cout<<"this is the index"<<locConfig.getIndex()<<std::endl;
 			indexPath = rootPath;
 			if (!indexPath.empty() && indexPath[indexPath.size() - 1] != '/')
 				indexPath += '/';
@@ -206,7 +197,6 @@ int get_method(client &cli, server &srv, const LocationConfig& locConfig, std::s
 		cli.setGetFileFd(open(chr_str, O_RDONLY));
 		if (cli.getGetFileFd() < 0)
 		{
-			std::cerr<<"I WILL KILL YOU "<<chr_str<<std::endl;
 			cli.getRes().setStatusCode(NOT_FOUND);
 			cli.setState(ERROR);
 			return (-1);
@@ -282,27 +272,21 @@ int post_method(client &cli, server &srv, const LocationConfig& locConfig, std::
 	struct stat st;
 	if(!locConfig.getUploadEnable()) //and not CGI
 	{
-		std::cerr<<"IN POST METHOD "<<cli.getState()<<std::endl;
 		cli.getRes().setStatusCode(FORBIDDEN);
 		cli.setState(ERROR);
-		std::cerr<<"IN POST METHOD "<<cli.getState()<<std::endl;
 		return (-1);
 	}
 	if (locConfig.getUploadStore().empty())
 	{
-		std::cerr<<"in empty"<<std::endl;
 		cli.getRes().setStatusCode(INTERNAL_SERVER_ERROR);
 		cli.setState(ERROR);
 		return (-1);
 	}
 	if (locConfig.getUploadStore() != "")
 	{
-		std::cerr<<"not empty"<<std::endl;
-		std::cerr<<locConfig.getUploadStore()<<std::endl;
 		std::string newUploadStore = setupUploadStore(locConfig);
 		if(stat(newUploadStore.c_str(),&st) == -1||!S_ISDIR(st.st_mode))
 		{
-			std::cerr<<"not is dir"<<std::endl;
 
 			cli.getRes().setStatusCode(INTERNAL_SERVER_ERROR);
 			cli.setState(ERROR);

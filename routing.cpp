@@ -62,7 +62,21 @@ int checkValidLocConfig(client &cli, server &srv, const LocationConfig& locConfi
 	}
 	return 0;
 }
+// bool isCgiRequest(client &cli, const LocationConfig &loc)
+// {
+// 	// 1. Location must have a cgi_pass configured
+// 	if (!loc.getisCgiLoc())
+// 		return false;
 
+// 	// 2. URI extension must match configured cgi extension
+// 	std::string uri = cli.getReq().getUri();
+// 	size_t dot = uri.rfind('.');
+// 	if (dot == std::string::npos)
+// 		return false;
+
+// 	std::string ext = uri.substr(dot);     // ".py" or ".php"
+// 	return (ext == loc.getCgi()); // from your config
+// }
 
 int handleRouting(client &cli, server &srv)
 {
@@ -76,62 +90,47 @@ int handleRouting(client &cli, server &srv)
 		{
 			return 1;
 		}
-		//if(cgi)
+		if (cli.getIsCgi())
+			return setupCgi(cli, srv);
 		if (cli.getReq().getMethod() == "GET")
 		{
 			get_method(cli, srv, *matchedLocation, uri);
 		}
 		else if (cli.getReq().getMethod() == "POST")
 		{
-			std::cerr<<"in post hereeeeeeeeee"<<std::endl;
 			post_method(cli, srv, *matchedLocation, uri);
 		}
 		else if (cli.getReq().getMethod() == "DELETE")
 		{
-			struct stat st;
-			std::string filePath = setupRootPath(cli, srv, *matchedLocation, uri);
-			if(stat(filePath.c_str(), &st) == 0 && S_ISDIR(st.st_mode))
-			{
-				cli.getRes().setStatusCode(FORBIDDEN);
-				cli.setState(ERROR);
-				return 1;
-			}
-			if(remove(filePath.c_str()) != 0)
-			{
-				cli.getRes().setStatusCode(404);
-				cli.setState(ERROR);
-				return 1;
-			}
-			else
-			{
-				cli.getRes().setStatusCode(204);
-				cli.setState(ERROR);
-				return 1;
-			}
+		    struct stat st;
+		    std::string filePath = setupRootPath(cli, srv, *matchedLocation, uri);
+
+		    if (stat(filePath.c_str(), &st) != 0)
+		    {
+		        cli.getRes().setStatusCode(404);
+		        cli.setState(ERROR);
+		        return 1;
+		    }
+
+		    if (S_ISDIR(st.st_mode))
+		    {
+		        cli.getRes().setStatusCode(403);
+		        cli.setState(ERROR);
+		        return 1;
+		    }
+
+		    if (remove(filePath.c_str()) != 0)
+		    {
+		        cli.getRes().setStatusCode(403);
+		        cli.setState(ERROR);
+		        return 1;
+		    }
+
+		    cli.getRes().setStatusCode(204);
+		    cli.setState(SENDING_RESPONSE); // NOT ERROR
+		    return 0;
 		}
 	}
-	else
-	{
-		std::cout<<"out matched locatio\n";
-
-	}
-	// else
-	// {
-	// 	if(checkValidLocConfig(cli, srv, LocationConfig()) == 1) //check default location
-	// 	{
-	// 		cli.getRes().setStatusCode(METHOD_NOT_ALLOWED);
-	// 		return -1;//method not allowed 405
-	// 	}
-	// }
-	  //handle default location
-	  //similar to get method but with default location config
-	  //if no default location => return 404 not found
-	// else
-	// {
-	// 	cli.getRes().setStatusCode(NOT_FOUND);
-	// 	cli.setState(ERROR);
-	// 	return 1;
-	// }
 	return 1;
 
 }

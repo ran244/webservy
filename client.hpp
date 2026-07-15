@@ -3,10 +3,10 @@
 /*                                                        :::      ::::::::   */
 /*   client.hpp                                         :+:      :+:    :+:   */
 /*                                                    +:+ +:+         +:+     */
-/*   By: tabuayya <tabuayya@student.42.fr>          +#+  +:+       +#+        */
+/*   By: rabusala <rabusala@student.42.fr>          +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2026/02/16 16:24:47 by rabusala          #+#    #+#             */
-/*   Updated: 2026/04/09 16:23:54 by tabuayya         ###   ########.fr       */
+/*   Updated: 2026/04/20 17:45:45 by rabusala         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -18,6 +18,7 @@
 #include "server.hpp"
 #include "HttpReq.hpp"
 #include "httpResponse.hpp"
+#include <ctime>
 enum ClientState
 {
 	READING,
@@ -44,7 +45,8 @@ class server;
 class client
 {
 	int fd;
-	server* _server;
+	std::time_t cgiStartTime;
+	server *_server;
 	const LocationConfig *location;
 	// server srv;
 	ClientState state;
@@ -59,7 +61,7 @@ class client
 	HttpReq req;
 	HttpResponse res;
 	size_t bodyStart;
-	//outfile
+	// outfile
 	size_t postFileSize;
 	int postFileFd;
 	int getFileFd;
@@ -73,80 +75,111 @@ class client
 	size_t bodySize;
 	size_t fileOffset;
 	size_t bytesTosend;
-	public:
-		client();
-		client(int fd,server *srv);
-		client(const client &other);
-		client& operator=(const client &other);
-		~client();
-		//getters
-		int getFd();
-		size_t getBytesToSend();
-		chunksStates getChunkState();
-		int getGetFileFd();
-		int getPostFileFd();
-		size_t getBytesSent();
-		int getCode();
-		bool getIsDir();
-		size_t getChunkSize();
-		size_t getBodyStart();
-		size_t getContentLength();
-		HttpReq& getReq();
-		ClientState getState();
-		std::string getHeader();
-		size_t getFileSize();
-		HttpResponse& getRes();
-		std::string getBuffer();
-		// std::string getResponseBuffer();
-		std::string& getResponseBuffer();              // modify
-		const std::string& getResponseBuffer() const;  // read-only
-		std::string getUploadPath() const;
-		size_t getBodySize();
-		size_t getFileOffset();
-		//setters
-		void setBytesToSend(size_t n);
-		void setFileOffset(size_t n);
-		void setBodySize(size_t s);
-		void setFd(int fd);
-		void setBytesSent(size_t n);
-		void setChunkSize(size_t size);
-		void setChunkState(chunksStates cstate);
-		void setBodyStart(size_t n);
-		void setState(ClientState state);
-		void setBuffer(const std::string &buffer);
-		void setResponseBuffer(const std::string &responseBuffer);
-		// std::string& getResponseBuffer() const;
-		void setContentLength(size_t contentLength);
-		void setHeaderComplete(bool headerComplete);
-		void setRequestComplete(bool requestComplete);
-		void setHeader(const std::string &header);
-		void appendToResBuffer(const std::string &data,size_t n);
-		void setFileSize(size_t num);
-		void addBytesSent(size_t num);
-		void setFileDone(bool done);
-		void setCode(int code);
-		void setPostFileFd(int fd);
-		void setGetFileFd(int fd);
-		void setIsDir(bool val);
-		void setIsChunkedEncoded(bool val);
-		void setUploadPath(std::string path);
-		void appendtobuff(std::string buff, size_t n){
-		buffer += buff;
-		n += n;
-		}
-		//checkers
-		bool isChunkedEncode();
-		bool isHeaderComplete();
-		bool isRequestComplete();
-		bool isFileDone();
-		void setServer(server* srv);
-    	server* getServer();
-    	const server* getServer() const;
-		const LocationConfig* getLocation();
-		void setLocation(const LocationConfig *loc);
+	bool isCgi;
 
+	// new
+	std::string cgiScriptPath;
+	std::string cgiInterpreter;
+
+	pid_t cgiPid;
+	int cgiInputFd;
+	int cgiOutputFd;
+
+	std::string cgiOutputBuffer;
+	std::string cgiInput;
+
+public:
+	client();
+	client(int fd, server *srv);
+	client(const client &other);
+	client &operator=(const client &other);
+	~client();
+	// getters
+	pid_t getCgiPid();
+	int getCgiInputFd();
+	int getCgiOutputFd();
+	std::string &getCgiInput(); // must be a ref so handleCgiWrite can erase from it
+	std::time_t getCgiStartTime();
+	std::string getCgiOutputBuffer();
+	std::string getCgiScriptPath();
+	std::string getCgiInterpreter();
+	bool getIsCgi();
+	int getFd();
+	size_t getBytesToSend();
+	chunksStates getChunkState();
+	int getGetFileFd();
+	int getPostFileFd();
+	size_t getBytesSent();
+	int getCode();
+	bool getIsDir();
+	size_t getChunkSize();
+	size_t getBodyStart();
+	size_t getContentLength();
+	HttpReq &getReq();
+	ClientState getState();
+	std::string getHeader();
+	size_t getFileSize();
+	HttpResponse &getRes();
+	std::string getBuffer();
+	// std::string getResponseBuffer();
+	std::string &getResponseBuffer();	      // modify
+	const std::string &getResponseBuffer() const; // read-only
+	std::string getUploadPath() const;
+	size_t getBodySize();
+	size_t getFileOffset();
+	// setters
+	void setCgiStartTime(std::time_t t);
+	void setCgiPid(pid_t pid);
+	void setCgiInputFd(int fd);
+	void setCgiOutputFd(int fd);
+	void setCgiOutputBuffer(std::string val);
+	void setCgiInput(std::string val);
+	void setCgiScriptPath(std::string value);
+	void setCgiInterpreter(std::string value);
+	void setIsCgi(bool val);
+	void setBytesToSend(size_t n);
+	void setFileOffset(size_t n);
+	void setBodySize(size_t s);
+	void setFd(int fd);
+	void setBytesSent(size_t n);
+	void setChunkSize(size_t size);
+	void setChunkState(chunksStates cstate);
+	void setBodyStart(size_t n);
+	void setState(ClientState state);
+	void setBuffer(const std::string &buffer);
+	void setResponseBuffer(const std::string &responseBuffer);
+	// std::string& getResponseBuffer() const;
+	void setContentLength(size_t contentLength);
+	void setHeaderComplete(bool headerComplete);
+	void setRequestComplete(bool requestComplete);
+	void setHeader(const std::string &header);
+	void appendToResBuffer(const std::string &data, size_t n);
+	void setFileSize(size_t num);
+	void addBytesSent(size_t num);
+	void setFileDone(bool done);
+	void setCode(int code);
+	void setPostFileFd(int fd);
+	void setGetFileFd(int fd);
+	void setIsDir(bool val);
+	void setIsChunkedEncoded(bool val);
+	void setUploadPath(std::string path);
+	void appendtobuff(const char *buff, size_t n)
+	{
+		buffer.append(buff,n);
+		// n += n;
+	}
+	// checkers
+	bool isChunkedEncode();
+	bool isHeaderComplete();
+	bool isRequestComplete();
+	bool isFileDone();
+	void setServer(server *srv);
+	server *getServer();
+	const server *getServer() const;
+	const LocationConfig *getLocation();
+	void setLocation(const LocationConfig *loc);
 };
 
-int handleRead(client &cli,int fd);
+int handleRead(client &cli, int fd, server &srv);
 
 #endif

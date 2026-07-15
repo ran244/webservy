@@ -3,14 +3,15 @@
 /*                                                        :::      ::::::::   */
 /*   httpParser.cpp                                     :+:      :+:    :+:   */
 /*                                                    +:+ +:+         +:+     */
-/*   By: tabuayya <tabuayya@student.42.fr>          +#+  +:+       +#+        */
+/*   By: rabusala <rabusala@student.42.fr>          +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2026/02/15 14:06:49 by rabusala          #+#    #+#             */
-/*   Updated: 2026/04/09 15:21:28 by tabuayya         ###   ########.fr       */
+/*   Updated: 2026/04/21 20:02:54 by rabusala         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
 #include "HttpReq.hpp"
+#include "webserv.hpp"
 #include "client.hpp"
 #include <algorithm>
 #include <ctype.h>
@@ -73,15 +74,111 @@ int checkReqLine(client &cli)
 
 
 }
-int checkUri(std::string uri)
+#include <string>
+#include <cstdlib> // for strtol
+
+std::string urlDecode(const std::string& src)
 {
-	if(uri.find("../") != std::string::npos)
+	std::string result;
+	result.reserve(src.length());
+
+	for (size_t i = 0; i < src.length(); ++i)
+	{
+		if (src[i] == '%' && i + 2 < src.length())
+		{
+			// Check if next two chars are hex digits
+			char hex[3];
+			hex[0] = src[i + 1];
+			hex[1] = src[i + 2];
+			hex[2] = '\0';
+
+			char* endptr;
+			long value = std::strtol(hex, &endptr, 16);
+
+			if (*endptr == '\0') // valid hex
+			{
+				result += static_cast<char>(value);
+				i += 2; // skip next 2 chars
+			}
+			else
+			{
+				// invalid encoding, keep as is
+				result += src[i];
+			}
+		}
+		else if (src[i] == '+')
+		{
+			// optional: decode '+' as space
+			result += ' ';
+		}
+		else
+		{
+			result += src[i];
+		}
+	}
+
+	return result;
+}
+void parseCgiInput(std::string uri, client &cli, server &srv)
+{
+	(void) srv;
+	if(cli.getReq().getMethod() == "GET")
+	{
+		size_t q = uri.find('?');
+		if (q != std::string::npos)
+			cli.setCgiInput(urlDecode(uri.substr(q + 1)));
+	}
+}
+void check_if_cgi(std::string uri, client &cli, server &srv)
+{
+	std::string cutUri = uri;
+	size_t q = uri.find('?');
+	if (q != std::string::npos)
+		cutUri = uri.substr(0, q);
+	std::string decoded = urlDecode(cutUri);
+	size_t dot = decoded.rfind('.');
+	std::string ext;
+
+	if (dot != std::string::npos)
+		ext = decoded.substr(dot);
+	const std::map<std::string, CGIConfig> *cgiMap ;
+	const std::map<std::string, LocationConfig> &locations = srv.getLocations();
+	const LocationConfig *matchedLocation = findLongestMatch(decoded, locations);
+	if (!matchedLocation)
+	{
+		cgiMap = &srv.getCgi();
+	}
+	else
+	{
+		cli.setLocation(matchedLocation);
+		cgiMap = &matchedLocation->getCgi();
+
+	}
+	std::string fullPath = setupRootPath(cli, srv, *matchedLocation, decoded);
+	if (!ext.empty() && cgiMap->find(ext) != cgiMap->end())
+	{
+		cli.setIsCgi(true);
+		parseCgiInput(uri, cli, srv);
+		cli.setCgiScriptPath(fullPath);
+		cli.setCgiInterpreter(cgiMap->at(ext).path);
+	}
+	cli.getReq().setUri(decoded);
+}
+int checkUri(std::string uri, client &cli, server &srv)
+{
+	(void)cli;
+	(void)srv;
+
+	std::string decoded = urlDecode(uri);
+	if (decoded.find("../") != std::string::npos)
 		return -1;
+	check_if_cgi(uri, cli, srv);
 	return 1;
 }
-int parseReqLine(client &cli,std::string &reqline)
+int parseReqLine(client &cli,std::string &reqline, server &srv)
 {
-	// printf("%s\n",reqline.c_str());
+	(void)srv;
+
 	std::string trimmedLine=ltrim(reqline);
 	size_t pos1=trimmedLine.find(" ");
 	if(pos1==std::string::npos)
@@ -91,7 +188,7 @@ int parseReqLine(client &cli,std::string &reqline)
 		return 1;
 	cli.getReq().setMethod(trim(trimmedLine.substr(0,pos1)));
 	cli.getReq().setUri(trim(trimmedLine.substr(pos1+1,pos2-pos1-1)));
-	if(checkUri(cli.getReq().getUri()) == -1)
+	if(checkUri(cli.getReq().getUri(), cli, srv) == -1)
 	{
 		cli.getRes().setStatusCode(403);
 		return 1;
@@ -152,18 +249,20 @@ int parseHeader(client &cli)
 			cli.setContentLength(len);
 
 		}
-		if(realKey == "Transfer-Encoding")
+		if(realKey == "transfer-encoding")
+		{
 			cli.setIsChunkedEncoded(true);
+		}
 	}
 	return 0;
 }
-int parseReq(client &cli)
+int parseReq(client &cli, server &srv)
 {
 	size_t pos=cli.getHeader().find("\r\n");
 	if(pos == std::string::npos)
 		return 1;
 	std::string requestLine = cli.getHeader().substr(0,pos);
-	if(parseReqLine(cli,requestLine) ==1)
+	if(parseReqLine(cli,requestLine, srv) ==1)
 		return 1;
 	cli.setHeader(cli.getHeader().erase(0,pos+2));
 	if(parseHeader(cli) ==1)
@@ -171,17 +270,18 @@ int parseReq(client &cli)
 	return 0;
 
 }
-int  checkHeader(client &cli)
+int  checkHeader(client &cli, server &srv)
 {
 	size_t pos = cli.getBuffer().find("\r\n\r\n");
 	if(pos!=std::string::npos)
 	{
 		cli.setHeaderComplete(true);
 		cli.setHeader(cli.getBuffer().substr(0,pos+2));
-		if(parseReq(cli) == 1)
+		if(parseReq(cli, srv) == 1)
 			return 1;
-		if(cli.getContentLength() > 0)
+		if(cli.getContentLength() > 0 || cli.isChunkedEncode())
 			cli.setBodyStart(pos+4);
+		cli.setBuffer(cli.getBuffer().erase(0,cli.getBodyStart()));
 	}
 	return 0;
 }
@@ -198,23 +298,27 @@ bool isHexString(const std::string& s)
 
 ssize_t convertHexa(client &cli)
 {
-    size_t pos = cli.getBuffer().find("\r\n");
-    if (pos == std::string::npos)
-        return -2;
-    std::string hexLine = cli.getBuffer().substr(0, pos);
+	std::string buffer = cli.getBuffer();
+	// size_t start = cli.getBodyStart();
+	size_t pos = buffer.find("\r\n");
+	if (pos == std::string::npos)
+		return -2;
+	std::string hexLine = buffer.substr(0, pos);
 	size_t semi = hexLine.find(';');
 	if (semi != std::string::npos)
-	    hexLine = hexLine.substr(0, semi);
+		hexLine = hexLine.substr(0, semi);
 	if (hexLine.empty() || !isHexString(hexLine))
-    	return -1;
-    size_t size = std::strtol(hexLine.c_str(), NULL, 16);
-    cli.setBuffer(cli.getBuffer().erase(0, pos + 2));
-    return size;
+	{
+		return -1;
+	}
+	size_t size = std::strtol(hexLine.c_str(), NULL, 16);
+	cli.setBuffer(cli.getBuffer().erase(0, pos + 2));
+	cli.setBodyStart(0);
+	return size;
 }
 int readChunks(client &cli)
 {
 	ssize_t chunkSize;
-	// size_t pos;
 	while(true)
 	{
 
@@ -224,7 +328,9 @@ int readChunks(client &cli)
 			if(chunkSize == -2)
 				return 0;
 			if(chunkSize < 0)
+			{
 				return -1;
+			}
 			if(chunkSize == 0)
 			{
 				cli.setChunkState(DONECHUNKING);
@@ -238,8 +344,10 @@ int readChunks(client &cli)
 			size_t needed=cli.getChunkSize()+2;
 			if(cli.getBuffer().size()<needed)
 				return 0;
-			if (cli.getBuffer()[cli.getChunkSize()] != '\r'||cli.getBuffer()[cli.getChunkSize() + 1] != '\n')
+			if (cli.getBuffer()[cli.getBodyStart()+cli.getChunkSize()] != '\r'||cli.getBuffer()[cli.getBodyStart()+cli.getChunkSize() + 1] != '\n')
+			{
 				return -1;
+			}
 			cli.getReq().appendBody(cli.getBuffer().substr(0,cli.getChunkSize()));
 			cli.setBuffer(cli.getBuffer().erase(0,needed));
 			if(cli.getReq().getBody().size() > (size_t)cli.getServer()->getMaxBodySize())
@@ -252,23 +360,24 @@ int readChunks(client &cli)
 	}
 	return 0;
 }
-int	handleRead(client &cli,int fd)
+int	handleRead(client &cli,int fd, server &srv )
 {
 	(void) fd;
 	char temp[4096];
 	ssize_t n=recv(cli.getFd(),temp,4096,0);
 	if(n == 0)
-		return 1;
+		return 0;
 	else if(n > 0)
 	{
 		cli.appendtobuff(temp,n);
 		if(!cli.isHeaderComplete())
 		{
-			if(checkHeader(cli) == 1)
+			if(checkHeader(cli, srv) == 1)
 			{
-				if(cli.getCode() == 0)
+				if(cli.getRes().getStatusCode() == 0)
 					cli.getRes().setStatusCode(400);
-				return 0;
+				cli.setState(ERROR);
+				return 1;
 			}
 		}
 		if(cli.isHeaderComplete())
@@ -281,44 +390,54 @@ int	handleRead(client &cli,int fd)
 					if(cli.getCode() == 0)
 						cli.getRes().setStatusCode(400);
 					cli.setState(ERROR);
-					return 0;
+					return 1;
 				}
-				if(checker == 1)
+				else if(checker == 1)
 				{
 					cli.setRequestComplete(true);
 					cli.setBodySize(cli.getReq().getBody().size());
+					if(cli.getIsCgi() && cli.getReq().getMethod() == "POST")
+					{
+						cli.setCgiInput(cli.getReq().getBody());
+					}
 					cli.setState(ROUTING);
+
 				}
 			}
 			else if(cli.getContentLength() > 0)
 			{
-				if(cli.getBuffer().size() >= cli.getBodyStart() + cli.getContentLength())
+				cli.getReq().appendBody(cli.getBuffer());
+				cli.setBuffer("");
+				if(cli.getReq().getBody().size() >= cli.getContentLength())
 				{
-					cli.getReq().setBody(cli.getBuffer().substr(cli.getBodyStart(),cli.getContentLength()));
+					std::ofstream out("testing");
+					out << cli.getReq().getBody();
 					cli.setRequestComplete(true);
-					cli.setBuffer(cli.getBuffer().erase(0,cli.getBodyStart() + cli.getContentLength()));
+					if (cli.getIsCgi() && cli.getReq().getMethod() == "POST")
+					{
+						cli.setCgiInput(cli.getReq().getBody());
+					}
 					cli.setState(ROUTING);
+				}
+				else
+				{
+					return 1;
 				}
 			}
 			else
 			{
 				cli.setRequestComplete(true);
-				cli.setBuffer(cli.getBuffer().erase(0,cli.getBodyStart()));
-				cli.setState(ROUTING);
+				return 0;
+				// cli.setBuffer(cli.getBuffer().erase(0,cli.getBodyStart()));
+				// cli.setState(ROUTING);
 			}
 		}
 	}
 	else
 	{
-		if(errno == EWOULDBLOCK || errno == EAGAIN)
-			return 0;//this is forbidden
-		else
-		{
-			cli.setState(DONE);
-			return 1;
-		}
+		return 1;
 	}
-	return 0;
+	return 1;
 }
 
 

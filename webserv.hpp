@@ -3,10 +3,10 @@
 /*                                                        :::      ::::::::   */
 /*   webserv.hpp                                        :+:      :+:    :+:   */
 /*                                                    +:+ +:+         +:+     */
-/*   By: bushra <bushra@student.42.fr>              +#+  +:+       +#+        */
+/*   By: rabusala <rabusala@student.42.fr>          +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2026/02/08 17:57:41 by tabuayya          #+#    #+#             */
-/*   Updated: 2026/04/09 13:36:39 by bushra           ###   ########.fr       */
+/*   Updated: 2026/04/20 18:36:29 by rabusala         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -40,13 +40,16 @@ class client;
 enum Codes
 {
 	OK = 200,
+	CREATED = 201,
 	BAD_REQUEST = 400,
 	FORBIDDEN = 403,
 	NOT_FOUND = 404,
 	METHOD_NOT_ALLOWED = 405,
 	PAYLOAD_TOO_LARGE = 413,
 	INTERNAL_SERVER_ERROR = 500,
-	NOT_IMPLEMENTED = 501
+	NOT_IMPLEMENTED = 501,
+	GATEWAY_TIMEOUT = 504
+
 };
 class webserv
 {
@@ -74,6 +77,11 @@ class webserv
 
 		std::vector<std::string> split(const std::string& line);
 };
+int setupCgi(client &cli, server &srv);
+int handleCgiWrite(client &cli, server &srv);
+int handleCgiRead(client &cli, server &srv);
+void buildCgiResponse(client &cli);
+void killCgi(client &cli, server &srv);
 int handleRouting(client &cli, server &srv);
 int	check_line(std::string line);
 std::string	s_trim(std::string str);
